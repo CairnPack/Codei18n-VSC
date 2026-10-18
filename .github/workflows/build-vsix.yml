@@ -1,0 +1,70 @@
+name: Build VSIX
+
+# 可复用的打包流程（nightly.yml、release.yml 调用）：lint、单测，然后打出 VSIX 与 sha256，
+# 作为 artifact `codei18n-vscode-<version>` 上传。集成测试在 ci.yml 中按平台与 VS Code 版本矩阵运行。
+
+on:
+  workflow_call:
+    inputs:
+      version:
+        description: 写入 package.json 的版本号（不带 v）；留空使用 package.json 中的版本
+        type: string
+        default: ''
+    outputs:
+      version:
+        description: 实际打包的版本号
+        value: ${{ jobs.build.outputs.version }}
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: 打包 VSIX
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+
+      - name: Lint 与单测
+        run: |
+          npm run lint
+          npm test
+
+      - name: 设置版本
+        id: version
+        env:
+          VERSION: ${{ inputs.version }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ -n "$VERSION" ]]; then
+            npm version "$VERSION" --no-git-tag-version --allow-same-version > /dev/null
+          fi
+          echo "version=$(node -p "require('./package.json').version")" >> "$GITHUB_OUTPUT"
+
+      - name: 打包
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p dist-vsix
+          npm run package -- --out "dist-vsix/codei18n-vscode-$VERSION.vsix"
+          (cd dist-vsix && sha256sum "codei18n-vscode-$VERSION.vsix" > "codei18n-vscode-$VERSION.vsix.sha256" && cat *.sha256)
+          echo "VSIX 大小：$(du -h "dist-vsix/codei18n-vscode-$VERSION.vsix" | cut -f1)" >> "$GITHUB_STEP_SUMMARY"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: codei18n-vscode-${{ steps.version.outputs.version }}
+          path: dist-vsix/*
+          if-no-files-found: error

@@ -1,0 +1,91 @@
+name: Release
+
+# 推送 `v*` tag 时构建并发布正式 Release，附件为 `.vsix` 与 `.sha256`。
+# tag 必须与 package.json 的版本一致（v0.1.0 ↔ 0.1.0）；带 `-` 的版本（例如 v0.2.0-beta.1）标记为预发布。
+# pull_request 修改本文件或 build-vsix.yml 时只做 dry-run：构建，不创建 Release。
+# 只使用 GITHUB_TOKEN（contents: write）。
+
+on:
+  push:
+    tags: ['v*']
+  pull_request:
+    paths:
+      - '.github/workflows/release.yml'
+      - '.github/workflows/build-vsix.yml'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  prepare:
+    name: 校验版本
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: tag 与 package.json 版本一致
+        id: version
+        env:
+          EVENT: ${{ github.event_name }}
+          REF_NAME: ${{ github.ref_name }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          version=$(node -p "require('./package.json').version")
+          if [[ "$EVENT" == push && "$REF_NAME" != "v$version" ]]; then
+            echo "::error::tag $REF_NAME 与 package.json 的版本 $version 不一致"
+            exit 1
+          fi
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+
+  build:
+    needs: prepare
+    uses: ./.github/workflows/build-vsix.yml
+    with:
+      version: ${{ needs.prepare.outputs.version }}
+
+  release:
+    name: 发布 GitHub Release
+    needs: [prepare, build]
+    if: github.event_name == 'push'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: codei18n-vscode-${{ needs.prepare.outputs.version }}
+          path: dist
+
+      - name: 创建 Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          VERSION: ${{ needs.prepare.outputs.version }}
+          TAG: ${{ github.ref_name }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          ls -l dist
+          flags=()
+          if [[ "$VERSION" == *-* ]]; then flags+=(--prerelease); fi
+          {
+            echo "安装：VS Code 命令面板 → Extensions: Install from VSIX…，选择 \`codei18n-vscode-$VERSION.vsix\`（需要 VS Code 1.105 或更高版本）。"
+            echo
+            echo "校验：\`sha256sum -c codei18n-vscode-$VERSION.vsix.sha256\`"
+          } > notes.md
+          # 先以草稿上传附件，再公开。
+          gh release create "$TAG" dist/* --verify-tag --title "$TAG" --notes-file notes.md --generate-notes --draft "${flags[@]}"
+          gh release edit "$TAG" --draft=false

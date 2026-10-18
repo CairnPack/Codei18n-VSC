@@ -1,0 +1,11 @@
+# 只发布打包后的扩展与运行时需要的 wasm
+**
+!dist/extension.js
+!dist/web-tree-sitter.wasm
+!grammars/*.wasm
+!grammars/README.md
+!package.json
+!package.nls.json
+!package.nls.zh-cn.json
+!README.md
+!LICENSE
