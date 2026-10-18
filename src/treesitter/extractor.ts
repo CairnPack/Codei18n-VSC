@@ -1,4 +1,4 @@
-import { Language, Node, Parser, Point, Tree } from 'web-tree-sitter';
+import { Edit, Language, Node, Parser, Point, Tree } from 'web-tree-sitter';
 import { lineStarts, line as lineOf, Piece } from '../core/commentGroups';
 import { GrammarName, LanguageSyntax } from '../core/commentSyntax';
 
@@ -89,12 +89,12 @@ export class ParsedDocument {
                     break;
                 }
                 const newEndIndex = startIndex + change.text.length;
-                this.tree!.edit({
+                this.tree!.edit(new Edit({
                     startIndex, oldEndIndex, newEndIndex,
                     startPosition: { row: change.startLine, column: change.startCharacter },
                     oldEndPosition: { row: change.endLine, column: change.endCharacter },
                     newEndPosition: endPoint(change.startLine, change.startCharacter, change.text),
-                });
+                }));
                 running = running.substring(0, startIndex) + change.text + running.substring(oldEndIndex);
             }
             if (running !== newText) incremental = false;
