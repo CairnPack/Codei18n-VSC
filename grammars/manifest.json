@@ -1,0 +1,71 @@
+{
+  "generator": "scripts/build-grammars.mjs",
+  "compiler": "clang version 21.1.4 (https://github.com/llvm/llvm-project 222fc11f2b8f25f6a0f4976272ef1bb7bf49521d)",
+  "smacker": "go-tree-sitter@v0.0.0-20240827094217-dd81d9e9be82",
+  "grammars": {
+    "java": {
+      "source": "smacker:java",
+      "sources": {
+        "parser.c": "f9bfb7fb2495d0f360ca60ea318d67fddb19a01c593c6a2f0bfb3dc7585da205"
+      },
+      "wasmSha256": "4e45dd0c40945afcaa0a10eb479fc1a96d929ab655000b2c4635f605d90fc066",
+      "bytes": 450081
+    },
+    "kotlin": {
+      "source": "smacker:kotlin",
+      "sources": {
+        "parser.c": "e486939abf7bf949f878b3441139cab89ae4a22367dd38cf31b0b5fc6dafa2f1",
+        "scanner.c": "bd60ae89620963afee7d615ff635da33427535c10b6e1c2cef5e3bff73bb95b3"
+      },
+      "wasmSha256": "5e53aeb808b0727ed008261cd2c095f9c3eabb9b58f3f85dd9ec66a7996f519b",
+      "bytes": 4096454
+    },
+    "c_sharp": {
+      "source": "smacker:csharp",
+      "sources": {
+        "parser.c": "339c2933609d727dbb47f905deff3121894406760d659f9aeeef862bc5375a28",
+        "scanner.c": "d1f6bb8fe05a2093c6cafed41ef48deb26206a91db27203ab2db468ef88f4518"
+      },
+      "wasmSha256": "bceed39dc03fd05a7f6b0c81e92ecc6e4a9a29e6bad547a14afe893bbc198f9d",
+      "bytes": 5646117
+    },
+    "javascript": {
+      "source": "smacker:javascript",
+      "sources": {
+        "parser.c": "ebb0d10860cd5266d6eda39c88e2c4829294ddfd2b6aee37d03aea957913430b",
+        "scanner.c": "f28201ecd6b7fdf471346de4da02998e5e7e69cc37c1472a729f3a1e5befde97"
+      },
+      "wasmSha256": "d42072767c685f94735fddefcb57d1021b7ffcc3f67793f8992ab4f764750f2d",
+      "bytes": 388954
+    },
+    "typescript": {
+      "source": "smacker:typescript/typescript",
+      "sources": {
+        "parser.c": "e5d5ddf098b784c0435805fd7ed9197f38205795b913992cacab561fec88c977",
+        "scanner.c": "130693070291aa35649133e35e813a975668a65d6f093b8098b97e4b1bad80ec",
+        "scanner.h": "10a96ae2bedde0edb0afe7dcb9272b8f59f46691d72c455c08a7998a1b47b5df"
+      },
+      "wasmSha256": "316f6efbcb4286a1b07d267f3fa05690b754bb41138ad99246fb26a701101f57",
+      "bytes": 1438326
+    },
+    "tsx": {
+      "source": "smacker:typescript/tsx",
+      "sources": {
+        "parser.c": "4d9afd967edb75e5230016b3b1f5be2f97ae97e07785969faca2715d29cf5107",
+        "scanner.c": "6d3c0c14702aeae118a8d33c554226f25dc2472469d80bed747505b757dfea5c",
+        "scanner.h": "10a96ae2bedde0edb0afe7dcb9272b8f59f46691d72c455c08a7998a1b47b5df"
+      },
+      "wasmSha256": "51ecc669d2aa0a6c20c24b18ee171789254b9ab3ad3dfdd9945b5d1638e1c33e",
+      "bytes": 1503837
+    },
+    "dart": {
+      "source": "core:adapters/dart/grammar",
+      "sources": {
+        "parser.c": "3609f279518c80e85ae1653dcf466ec09321a96b85570f4e52a4a0dad46b0d81",
+        "scanner.c": "d1e93f206dc51441ecd972395caf77c2a401802add582d0ed40fcd703d713556"
+      },
+      "wasmSha256": "ec34fef0daa70043be494c9397f4f3462a7f325f282aa6b451dfe1026962fd70",
+      "bytes": 977635
+    }
+  }
+}
