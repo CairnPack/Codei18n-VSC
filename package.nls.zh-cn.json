@@ -1,0 +1,11 @@
+{
+  "description": "读取项目 .codei18n 缓存，在注释旁显示 CodeI18n 译文（只读）。",
+  "command.toggle": "显示 CodeI18n 译文",
+  "command.toggleSideView": "在侧边打开 CodeI18n 译文视图",
+  "command.reload": "重新加载 CodeI18n 译文（Reload CodeI18n Translations）",
+  "config.enabled": "显示 CodeI18n 注释译文。",
+  "config.language": "显示语言，例如 zh-CN、zh-TW、ja。留空则跟随项目 .codei18n 配置。",
+  "config.ghostText.enabled": "在注释（组）最后一行的行尾以幽灵文字显示译文。",
+  "config.ghostText.maxLength": "幽灵文字的最大字符数；更长或多行的译文只显示开头并加 “…”。",
+  "config.hover.enabled": "悬停在有译文的注释上时显示完整译文。"
+}

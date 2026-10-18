@@ -1,0 +1,11 @@
+{
+  "description": "Shows CodeI18n comment translations from the project's .codei18n cache (read-only).",
+  "command.toggle": "Show CodeI18n Translations",
+  "command.toggleSideView": "Open CodeI18n Translation View to the Side",
+  "command.reload": "Reload CodeI18n Translations",
+  "config.enabled": "Show CodeI18n comment translations.",
+  "config.language": "Display language, e.g. zh-CN, zh-TW, ja. Leave empty to follow the project's .codei18n configuration.",
+  "config.ghostText.enabled": "Show translations as ghost text at the end of the comment's last line.",
+  "config.ghostText.maxLength": "Maximum number of characters of ghost text; longer or multi-line translations are cut with '…'.",
+  "config.hover.enabled": "Show the full translation when hovering a translated comment."
+}
