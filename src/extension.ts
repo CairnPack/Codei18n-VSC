@@ -2,6 +2,7 @@ import * as vscode from 'vscode';
 import { TranslationController } from './controller';
 import { ghostText } from './core/display';
 import { anchorOf, ghostSettings, GhostTextPresenter, hoverMarkdown, StatusBarPresenter, TranslationHoverProvider } from './presentation';
+import { SideViewController, viewUri } from './sideView';
 import { Grammars } from './treesitter/extractor';
 
 export function activate(context: vscode.ExtensionContext): void {
@@ -10,13 +11,16 @@ export function activate(context: vscode.ExtensionContext): void {
         name => vscode.Uri.joinPath(context.extensionUri, 'grammars', `tree-sitter-${name}.wasm`).fsPath,
     );
     const controller = new TranslationController(grammars);
+    const sideView = new SideViewController(controller);
     context.subscriptions.push(
         controller,
+        sideView,
         new GhostTextPresenter(controller),
         new StatusBarPresenter(controller),
         vscode.languages.registerHoverProvider({ pattern: '**' }, new TranslationHoverProvider(controller)),
         vscode.commands.registerCommand('codei18n.toggle', toggleEnabled),
         vscode.commands.registerCommand('codei18n.reload', () => controller.reload()),
+        vscode.commands.registerCommand('codei18n.toggleSideView', () => sideView.toggle()),
     );
 
     // 扩展拿不到装饰的渲染结果：测试模式下提供内部命令，返回当前计算出的提示列表。
@@ -42,6 +46,12 @@ export function activate(context: vscode.ExtensionContext): void {
                     hover: hoverMarkdown(document, h, result.index?.language ?? '').value,
                 })),
             };
+        }));
+        context.subscriptions.push(vscode.commands.registerCommand('codei18n._test.sideView', async (uri: string) => {
+            await controller.idle();
+            const view = viewUri(vscode.Uri.parse(uri));
+            const snapshot = sideView.snapshot(view);
+            return snapshot && { uri: view.toString(), text: snapshot.text, blocks: snapshot.lines.blocks };
         }));
     }
 }
