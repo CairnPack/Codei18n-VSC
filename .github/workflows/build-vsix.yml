@@ -26,9 +26,9 @@ jobs:
     outputs:
       version: ${{ steps.version.outputs.version }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           node-version: 22
           cache: npm
@@ -63,7 +63,7 @@ jobs:
           (cd dist-vsix && sha256sum "codei18n-vscode-$VERSION.vsix" > "codei18n-vscode-$VERSION.vsix.sha256" && cat *.sha256)
           echo "VSIX 大小：$(du -h "dist-vsix/codei18n-vscode-$VERSION.vsix" | cut -f1)" >> "$GITHUB_STEP_SUMMARY"
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: codei18n-vscode-${{ steps.version.outputs.version }}
           path: dist-vsix/*
