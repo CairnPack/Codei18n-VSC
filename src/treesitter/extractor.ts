@@ -48,6 +48,10 @@ export interface TextChange {
 export class ParsedDocument {
     private tree: Tree | null;
     private disposed = false;
+    /** tree 与 text 一致（没有待解析的修改）。 */
+    private parsedText = true;
+    /** 有无法增量应用的修改，下次整篇解析。 */
+    private broken = false;
 
     private constructor(private readonly parser: Parser, private readonly syntax: LanguageSyntax, private text: string) {
         this.tree = parser.parse(text);
@@ -71,38 +75,45 @@ export class ParsedDocument {
     }
 
     /**
-     * 更新到 `newText`。`changes` 按 VS Code 的顺序依次作用于旧文本；依次应用后与 `newText` 不一致
-     * （或没有提供 changes）时整篇重新解析。
+     * 依次应用 VS Code 的文本修改（tree.edit），不立即解析；下一次 update() 时增量重新解析。
+     * 修改无法应用时改为整篇重新解析。
+     */
+    applyChanges(changes: readonly TextChange[]): void {
+        if (this.disposed) return;
+        for (const change of changes) {
+            this.parsedText = false;
+            const starts = lineStarts(this.text);
+            const startIndex = offset(starts, this.text, change.startLine, change.startCharacter);
+            const oldEndIndex = offset(starts, this.text, change.endLine, change.endCharacter);
+            if (this.broken || !this.tree || startIndex < 0 || oldEndIndex < startIndex) {
+                this.broken = true;
+                return;
+            }
+            this.tree.edit(new Edit({
+                startIndex, oldEndIndex, newEndIndex: startIndex + change.text.length,
+                startPosition: { row: change.startLine, column: change.startCharacter },
+                oldEndPosition: { row: change.endLine, column: change.endCharacter },
+                newEndPosition: endPoint(change.startLine, change.startCharacter, change.text),
+            }));
+            this.text = this.text.substring(0, startIndex) + change.text + this.text.substring(oldEndIndex);
+        }
+    }
+
+    /**
+     * 解析到 newText。changes 按 VS Code 的顺序依次作用于上次的文本；应用后的文本与 newText
+     * 一致时增量重新解析，否则整篇重新解析。
      */
     update(newText: string, changes?: readonly TextChange[]): void {
         if (this.disposed) return;
-        if (newText === this.text) return;
-        let incremental = changes !== undefined && changes.length > 0 && this.tree !== null;
-        if (incremental) {
-            let running = this.text;
-            for (const change of changes!) {
-                const starts = lineStarts(running);
-                const startIndex = offset(starts, running, change.startLine, change.startCharacter);
-                const oldEndIndex = offset(starts, running, change.endLine, change.endCharacter);
-                if (startIndex < 0 || oldEndIndex < startIndex) {
-                    incremental = false;
-                    break;
-                }
-                const newEndIndex = startIndex + change.text.length;
-                this.tree!.edit(new Edit({
-                    startIndex, oldEndIndex, newEndIndex,
-                    startPosition: { row: change.startLine, column: change.startCharacter },
-                    oldEndPosition: { row: change.endLine, column: change.endCharacter },
-                    newEndPosition: endPoint(change.startLine, change.startCharacter, change.text),
-                }));
-                running = running.substring(0, startIndex) + change.text + running.substring(oldEndIndex);
-            }
-            if (running !== newText) incremental = false;
-        }
+        if (changes) this.applyChanges(changes);
+        if (newText === this.text && this.parsedText && !this.broken) return;
+        const incremental = !this.broken && newText === this.text;
         const old = this.tree;
         this.tree = this.parser.parse(newText, incremental ? old : null);
         old?.delete();
         this.text = newText;
+        this.parsedText = true;
+        this.broken = false;
     }
 
     /**

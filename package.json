@@ -114,7 +114,7 @@
     "build": "node scripts/build.mjs",
     "watch": "node scripts/build.mjs --watch",
     "typecheck": "tsc -p . --noEmit",
-    "lint": "eslint . && tsc -p . --noEmit",
+    "lint": "eslint . && tsc -p . --noEmit && tsc -p test/integration --noEmit",
     "test": "vitest run",
     "test:integration": "node scripts/build.mjs && tsc -p test/integration && node out/integration/runTest.js",
     "check:vectors": "node scripts/check-vectors.mjs",
@@ -129,12 +129,16 @@
     "@vscode/vsce": "4.0.0",
     "esbuild": "0.28.2",
     "eslint": "10.13.0",
-    "mocha": "12.0.3",
+    "mocha": "11.7.5",
     "typescript": "6.0.3",
     "typescript-eslint": "8.71.2",
     "vitest": "5.0.5"
   },
   "dependencies": {
     "web-tree-sitter": "0.26.13"
+  },
+  "overrides": {
+    "serialize-javascript": "^7.0.5",
+    "diff": "^8.0.3"
   }
 }
