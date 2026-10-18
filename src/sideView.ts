@@ -37,6 +37,14 @@ export class SideViewController implements vscode.TextDocumentContentProvider, v
                 this.views.get(doc.uri.toString())?.target.dispose();
                 this.views.delete(doc.uri.toString());
             }),
+            // setTextDocumentLanguage 会先关闭再重新打开视图文档，且不再调用 provideTextDocumentContent：
+            // 重新打开时重建条目并请求刷新内容。
+            vscode.workspace.onDidOpenTextDocument(doc => {
+                if (doc.uri.scheme !== SCHEME || this.views.has(doc.uri.toString())) return;
+                const source = sourceUri(doc.uri);
+                this.views.set(doc.uri.toString(), { source, lines: new LineMap([]), text: doc.getText(), target: this.controller.addTarget(source) });
+                this.changed.fire(doc.uri);
+            }),
             vscode.window.onDidChangeTextEditorVisibleRanges(e => this.sync(e.textEditor, e.visibleRanges)),
         );
     }

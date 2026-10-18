@@ -56,11 +56,13 @@ export class MappingIndex {
         private readonly comments: ReadonlyMap<string, ReadonlyMap<string, string>>,
         private readonly global: ReadonlyMap<string, GlobalEntry>,
         private readonly locations: LocationIndex | null,
+        /** index.json 存在但无法解析时的错误信息（此时只用 mappings.json）。 */
+        readonly indexError?: string,
     ) {}
 
     /**
-     * `index` 为 undefined 表示没有 index.json；主版本不认识的 index.json 被忽略。
-     * JSON 无效或结构错误时抛出异常。
+     * `index` 为 undefined 表示没有 index.json。主版本不认识或无法解析的 index.json 被忽略，只用 mappings.json
+     * （docs/index-format.md §9.1）；无法解析的原因记在 indexError。mappings.json / config.json 无效时抛出异常。
      */
     static parse(mappings: string, config: string, index: string | undefined, languageOverride: string): MappingIndex {
         const data = object(JSON.parse(stripBom(mappings)), 'mappings');
@@ -78,8 +80,14 @@ export class MappingIndex {
                 comments.set(id, texts);
             }
         }
-        const locations = index === undefined ? null : LocationIndex.parse(index);
-        return new MappingIndex(target, comments, globalIndex(comments, target), locations);
+        let locations: LocationIndex | null = null;
+        let indexError: string | undefined;
+        try {
+            locations = index === undefined ? null : LocationIndex.parse(index);
+        } catch (e) {
+            indexError = e instanceof Error ? e.message : String(e);
+        }
+        return new MappingIndex(target, comments, globalIndex(comments, target), locations, indexError);
     }
 
     get hasLocations(): boolean {
@@ -112,10 +120,8 @@ export class MappingIndex {
             let entry: Entry | undefined;
             let via: MatchVia = 'location';
             if (file.contentHash !== null && file.contentHash === entries.contentHash) {
-                const starts = lineStarts(file.text);
-                const ln = line(starts, start) + 1;
-                const col = column(starts, start) + 1;
-                entry = entries.comments.find(e => e.range.startLine === ln && e.range.startCol === col && e.parts === parts);
+                const starts = startsOf(file.text);
+                entry = lookup(entries).byPosition.get(`${line(starts, start) + 1}:${column(starts, start) + 1}:${parts}`);
             }
             if (!entry) {
                 entry = byTextHash(entries, file.text, start, end, parts, rank, total);
@@ -194,11 +200,9 @@ function globalIndex(comments: ReadonlyMap<string, ReadonlyMap<string, string>>,
 function byTextHash(entries: FileEntries, text: string, start: number, end: number, parts: number,
     rank: number, total: number): Entry | undefined {
     const hash = textHash(text.substring(start, end));
-    const same = entries.comments
-        .filter(e => e.textHash === hash && e.parts === parts)
-        .sort((a, b) => a.range.startLine - b.range.startLine || a.range.startCol - b.range.startCol);
+    const same = lookup(entries).byHash.get(`${hash}:${parts}`) ?? [];
     if (rank >= 0 && same.length === total && rank < same.length) return same[rank];
-    const ln = line(lineStarts(text), start) + 1;
+    const ln = line(startsOf(text), start) + 1;
     let best: Entry | undefined;
     let bestDistance = Number.MAX_SAFE_INTEGER;
     let tie = false;
@@ -213,6 +217,47 @@ function byTextHash(entries: FileEntries, text: string, start: number, end: numb
         }
     }
     return tie ? undefined : best;
+}
+
+interface Lookup {
+    /** `startLine:startCol:parts` → 条目（第一个）。 */
+    readonly byPosition: Map<string, Entry>;
+    /** `textHash:parts` → 按起始位置排序的条目。 */
+    readonly byHash: Map<string, Entry[]>;
+}
+
+const lookups = new WeakMap<FileEntries, Lookup>();
+
+/** 文件条目的查找表，每个文件只建一次（大文件逐组匹配时避免平方级开销）。 */
+function lookup(entries: FileEntries): Lookup {
+    let result = lookups.get(entries);
+    if (!result) {
+        result = { byPosition: new Map(), byHash: new Map() };
+        for (const e of entries.comments) {
+            const position = `${e.range.startLine}:${e.range.startCol}:${e.parts}`;
+            if (!result.byPosition.has(position)) result.byPosition.set(position, e);
+            const key = `${e.textHash}:${e.parts}`;
+            const list = result.byHash.get(key);
+            if (list) list.push(e); else result.byHash.set(key, [e]);
+        }
+        for (const list of result.byHash.values()) {
+            list.sort((a, b) => a.range.startLine - b.range.startLine || a.range.startCol - b.range.startCol);
+        }
+        lookups.set(entries, result);
+    }
+    return result;
+}
+
+let cachedText: string | undefined;
+let cachedStarts: number[] = [];
+
+/** 同一文本的行起始偏移只算一次（scan 对每组注释都要用）。 */
+function startsOf(text: string): number[] {
+    if (text !== cachedText) {
+        cachedText = text;
+        cachedStarts = lineStarts(text);
+    }
+    return cachedStarts;
 }
 
 function sourceLanguage(entry: Entry): string {

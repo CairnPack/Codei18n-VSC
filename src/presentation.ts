@@ -68,8 +68,9 @@ export class GhostTextPresenter implements vscode.Disposable {
         }
         // 同一行有多条译文（例如块注释后接行尾注释）时合并显示。
         const byLine = new Map<number, string[]>();
+        const length = document.getText().length; // getText 每次都会重新拼接整篇文本，只取一次
         for (const hint of hints) {
-            if (hint.end > document.getText().length) continue;
+            if (hint.end > length) continue;
             const text = ghostText(hint.text, settings.maxLength);
             if (text === '') continue;
             const line = anchorOf(document, hint).line;

@@ -39,6 +39,9 @@ export interface TextChange {
     readonly endLine: number;
     readonly endCharacter: number;
     readonly text: string;
+    /** VS Code 给出的 rangeOffset / rangeLength；提供时不必为每处修改扫描整篇文本求偏移。 */
+    readonly offset?: number;
+    readonly length?: number;
 }
 
 /**
@@ -82,9 +85,17 @@ export class ParsedDocument {
         if (this.disposed) return;
         for (const change of changes) {
             this.parsedText = false;
-            const starts = lineStarts(this.text);
-            const startIndex = offset(starts, this.text, change.startLine, change.startCharacter);
-            const oldEndIndex = offset(starts, this.text, change.endLine, change.endCharacter);
+            let startIndex: number;
+            let oldEndIndex: number;
+            if (change.offset !== undefined && change.length !== undefined) {
+                startIndex = change.offset;
+                oldEndIndex = change.offset + change.length;
+                if (oldEndIndex > this.text.length) startIndex = -1;
+            } else {
+                const starts = lineStarts(this.text);
+                startIndex = offset(starts, this.text, change.startLine, change.startCharacter);
+                oldEndIndex = offset(starts, this.text, change.endLine, change.endCharacter);
+            }
             if (this.broken || !this.tree || startIndex < 0 || oldEndIndex < startIndex) {
                 this.broken = true;
                 return;

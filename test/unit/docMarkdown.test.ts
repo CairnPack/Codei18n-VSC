@@ -42,6 +42,26 @@ describe('悬停 Markdown', () => {
         expect(toMarkdown('/*\n * 块注释\n *\n * 第二段\n */', false, 'NONE', 'zh-CN')).toBe('块注释\n\n第二段');
     });
 
+    it('代码片段里的 HTML 与 Markdown 不会漏出代码样式（悬停 supportHtml）', () => {
+        const javadoc = toMarkdown('/** 说明 {@code `a` <img src="https://evil.example/p.png"> `b`} */', true, 'JAVADOC', 'zh-CN');
+        expect(javadoc).toBe('说明 `` `a` <img src="https://evil.example/p.png"> `b` ``');
+        const image = toMarkdown('/** {@code `x` ![p](https://e.example/p.png) `y`} */', true, 'JAVADOC', 'zh-CN');
+        expect(image).toBe('`` `x` ![p](https://e.example/p.png) `y` ``');
+        const csharp = toMarkdown('/// <summary><c>`a` &lt;img src="x"&gt; `b`</c></summary>', true, 'CSHARP', 'en');
+        expect(csharp).toBe('`` `a` <img src="x"> `b` ``');
+        // 不合法的围栏开头行（信息串里有反引号）不会原样输出：整段落在这里生成的更长围栏之内
+        const badFence = toMarkdown('/**\n * ``` a`b\n * <img src="https://e.example/x.png">\n */', true, 'KDOC', 'zh-CN');
+        expect(badFence).toBe('````\n``` a`b\n<img src="https://e.example/x.png">\n````');
+    });
+
+    it('译文用 4 个以上反引号开的围栏：用 3 个反引号关不上；所有代码块都由这里闭合，底部信息不会被吞进去', () => {
+        // DocMarkup（与 IDEA 一致）把第二个 ```` 之后当作新的代码块
+        const md = toMarkdown('/**\n * ````\n * code\n * ```\n * ````\n * after\n */', true, 'KDOC', 'zh-CN');
+        expect(md).toBe('````\ncode\n```\n````\n\n```\nafter\n```');
+        // 没有闭合的围栏也由这里补上
+        expect(toMarkdown('/**\n * ```\n * code\n */', true, 'KDOC', 'zh-CN')).toBe('```\ncode\n```');
+    });
+
     it('行内代码的反引号围栏', () => {
         expect(inlineCode('a`b')).toBe('``a`b``');
         expect(inlineCode('`x`')).toBe('`` `x` ``');

@@ -123,10 +123,14 @@ describe('index.json 匹配', () => {
         expect(m.via).toBe('global');
     });
 
-    it('不认识的主版本忽略索引；损坏的 index.json 报错；没有 index.json 与旧版本一样', () => {
+    it('不认识的主版本或无法解析的 index.json 都忽略，只用 mappings.json（§9.1）；没有 index.json 与旧版本一样', () => {
         expect(MappingIndex.parse(MAPPINGS, '{}', '{"version":"2","files":{}}', '').hasLocations).toBe(false);
         expect(MappingIndex.parse(MAPPINGS, '{}', '{"version":"1.3","files":{}}', '').hasLocations).toBe(true);
-        expect(() => MappingIndex.parse(MAPPINGS, '{}', '{broken', '')).toThrow();
+        // IDEA 插件在这里整体报错；契约 docs/index-format.md §9.1 要求退回只用 mappings.json，以契约为准。
+        const broken = MappingIndex.parse(MAPPINGS, '{}', '{broken', '');
+        expect(broken.hasLocations).toBe(false);
+        expect(broken.indexError).toBeDefined();
+        expect(broken.translation('// First line\n// Second line')).toBe('// 第一行\n// 第二行');
         expect(MappingIndex.parse(MAPPINGS, '{}', undefined, '').hasLocations).toBe(false);
     });
 });

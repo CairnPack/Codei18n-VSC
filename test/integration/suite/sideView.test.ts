@@ -103,6 +103,21 @@ describe('侧边译文视图', () => {
         assert.ok(disk.equals(readFileSync(join(process.env.CODEI18N_FIXTURES!, 'OrderService.java'))));
     });
 
+    it('源文件的 languageId 与扩展名推断的不同时，视图仍随原文件刷新', async () => {
+        const opened = await open('format.js');
+        const count = expectedHints('format.js').length;
+        const source = await vscode.languages.setTextDocumentLanguage(opened.document, 'plaintext');
+        const editor = await vscode.window.showTextDocument(source);
+        await waitFor(() => state(source), s => s?.hints.length === count, '原文件译文');
+        await vscode.commands.executeCommand('codei18n.toggleSideView');
+        const view = await waitFor(async () => viewEditor(), e => !!e && e.document.languageId === 'plaintext', '视图打开且语言相同');
+        await waitFor(async () => view!.document.getText(), t => t.includes('[MOCK en->zh-CN]'), '视图内容');
+        await editor.edit(b => b.insert(new vscode.Position(0, 0), '// 新加的一行\n'));
+        await waitFor(async () => viewEditor()?.document.getText() ?? '', t => t.startsWith('// 新加的一行\n') && t.includes('[MOCK en->zh-CN]'), '视图刷新');
+        await vscode.window.showTextDocument(editor.document, editor.viewColumn);
+        await vscode.commands.executeCommand('workbench.action.files.revert');
+    });
+
     it('滚动同步：两边滚动时相同的代码行对齐（注释行数变化时按行映射）', async () => {
         const path = join(workspaceDir(), 'Long.java');
         const base = readFileSync(join(workspaceDir(), 'OrderService.java'), 'utf8');

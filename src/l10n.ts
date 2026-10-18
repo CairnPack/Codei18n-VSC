@@ -11,6 +11,7 @@ const ZH = {
     statusError: (message: string) => `CodeI18n 加载出错：${message}`,
     sideViewTitle: (name: string) => `${name}（译文）`,
     noRoot: '当前文件不在含 .codei18n 的项目中。',
+    indexIgnored: (message: string) => `index.json 无法解析，已忽略，只用 mappings.json 匹配（${message}）`,
 };
 
 const EN: typeof ZH = {
@@ -23,6 +24,7 @@ const EN: typeof ZH = {
     statusError: message => `CodeI18n failed to load: ${message}`,
     sideViewTitle: name => `${name} (translated)`,
     noRoot: 'This file is not in a project with a .codei18n directory.',
+    indexIgnored: message => `index.json cannot be parsed and is ignored; matching uses mappings.json only (${message})`,
 };
 
 export const t: typeof ZH = vscode.env.language.toLowerCase().startsWith('zh') ? ZH : EN;

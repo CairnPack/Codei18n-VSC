@@ -32,7 +32,7 @@ VS Code 没有 IDEA 那样的块级 inlay（不能在注释下方插入虚拟行
 - `mappings.json`：注释 ID → 语言 → 文本；
 - `index.json`（可选，`codei18n map update` 生成）：每条注释的位置、类型、原语言、文本哈希等，格式见 core 仓库的 `docs/index-format.md`。
 
-扩展从源码所在目录向上查找最近的 `.codei18n`，不越过所在的工作区文件夹，支持嵌套根目录与多根工作区。显示语言优先级：设置 `codei18n.language` → config 的 `localLanguage` → mappings 的 `targetLanguage` → `zh-CN`。
+扩展从源码所在目录向上查找最近的 `.codei18n`，不越过包含该文件的最外层工作区文件夹，支持嵌套根目录与多根工作区（包括互相嵌套的工作区文件夹）。显示语言优先级：设置 `codei18n.language` → config 的 `localLanguage` → mappings 的 `targetLanguage` → `zh-CN`。
 
 生成或更新缓存：
 
@@ -91,7 +91,7 @@ codei18n translate
 ## 边界与已知限制
 
 - 幽灵文字只显示译文的**首行**（多行时加 `…`），完整译文看悬停或侧边视图；不做语法高亮。
-- 大于 2 MiB 的源码不处理；大于 32 MiB 的 JSON 拒绝加载并提示；`index.json` 主版本不认识时忽略整个文件，只用 `mappings.json`。
+- 大于 2 MiB 的源码不处理；大于 32 MiB 的 JSON 拒绝加载并提示；`index.json` 主版本不认识或无法解析时忽略整个文件，只用 `mappings.json`（无法解析时提示一次；IDEA 插件此时会撤下全部译文，这里按 `docs/index-format.md` §9.1 处理）。
 - Go、Rust 等没有内置语法的文件只在未修改时按位置显示；文件有修改时不显示。
 - 侧边视图的标签名与原文件相同（虚拟文档，scheme 为 `codei18n`）。
 - 不支持 Web 版 VS Code（vscode.dev）与虚拟工作区。

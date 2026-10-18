@@ -80,6 +80,7 @@ describe('tree-sitter 提取', () => {
     it('增量解析与整篇解析的结果相同', async () => {
         let text = readFileSync(join(FIXTURES, 'Inventory.kt'), 'utf8');
         const doc = await parse('Inventory.kt', text);
+        const byOffset = await parse('Inventory.kt', text); // 用 VS Code 的 rangeOffset / rangeLength
         const edits = [
             { line: 0, ch: 0, endLine: 0, endCh: 0, text: '// 新增的第一行 😀\n' },
             { line: 9, ch: 4, endLine: 9, endCh: 7, text: '/** 文档\n     * 第二行' },
@@ -90,10 +91,14 @@ describe('tree-sitter 提取', () => {
             const lines = text.split('\n');
             const at = (l: number, c: number) => lines.slice(0, l).reduce((n, s) => n + s.length + 1, 0) + c;
             const next = text.substring(0, at(e.line, e.ch)) + e.text + text.substring(at(e.endLine, e.endCh));
-            doc.update(next, [{ startLine: e.line, startCharacter: e.ch, endLine: e.endLine, endCharacter: e.endCh, text: e.text }]);
+            const change = { startLine: e.line, startCharacter: e.ch, endLine: e.endLine, endCharacter: e.endCh, text: e.text };
+            doc.update(next, [change]);
+            byOffset.applyChanges([{ ...change, offset: at(e.line, e.ch), length: at(e.endLine, e.endCh) - at(e.line, e.ch) }]);
+            byOffset.update(next);
             text = next;
             const fresh = await parse('Inventory.kt', text);
             expect(doc.pieces()).toEqual(fresh.pieces());
+            expect(byOffset.pieces()).toEqual(fresh.pieces());
         }
     });
 

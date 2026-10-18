@@ -38,32 +38,35 @@ export function toMarkdown(translation: string, doc: boolean, family: Family, la
 
     // 段落块：普通文字行、空行、代码块。普通行之间用硬换行，其余之间空一行。
     const chunks: { kind: 'text' | 'blank' | 'block'; text: string }[] = [];
-    let fence: string | undefined; // 译文自带的 ``` / ~~~ 代码块
+    // 译文自带的 ``` / ~~~ 代码块：只接受合法的开头行，输出时由这里重新生成足够长的围栏，
+    // 译文里的围栏写法不会把后面的文字（或底部信息）吞进代码块，也不会让代码块提前结束。
+    let fence: { char: string; length: number; info: string } | undefined;
     let fenced: string[] = [];
     let block: string[] = []; // 整行都是代码（JSDoc @example、跨行 {@code}）的连续行
     const flushBlock = () => {
         if (block.length === 0) return;
-        const ticks = '`'.repeat(Math.max(3, longestRun(block.join('\n'), '`') + 1));
-        chunks.push({ kind: 'block', text: `${ticks}\n${dedent(block).join('\n')}\n${ticks}` });
+        chunks.push({ kind: 'block', text: codeBlock(dedent(block), '') });
         block = [];
+    };
+    const flushFence = () => {
+        chunks.push({ kind: 'block', text: codeBlock(fenced, fence!.info) });
+        fence = undefined;
+        fenced = [];
     };
 
     for (const line of lines) {
         const trimmed = line.text.trim();
         const allCode = trimmed !== '' && [...line.text].every((c, i) => line.kinds[i] === 'CODE' || c.trim() === '');
         if (fence !== undefined) {
-            if (trimmed.startsWith(fence)) {
-                chunks.push({ kind: 'block', text: [...fenced, fence].join('\n') });
-                fence = undefined;
-            } else {
-                fenced.push(line.text);
-            }
+            const close = /^(`+|~+)\s*$/.exec(trimmed);
+            if (close && close[1][0] === fence.char && close[1].length >= fence.length) flushFence();
+            else fenced.push(line.text);
             continue;
         }
-        if (allCode && (trimmed.startsWith('```') || trimmed.startsWith('~~~'))) {
+        const open = allCode ? /^(`{3,}|~{3,})([^`]*)$/.exec(trimmed) : null;
+        if (open) {
             flushBlock();
-            fence = trimmed.substring(0, 3);
-            fenced = [trimmed];
+            fence = { char: open[1][0], length: open[1].length, info: open[2].trim() };
             continue;
         }
         if (allCode && !isInlineCode(trimmed)) {
@@ -74,7 +77,7 @@ export function toMarkdown(translation: string, doc: boolean, family: Family, la
         chunks.push(trimmed === '' ? { kind: 'blank', text: '' } : { kind: 'text', text: renderLine(line.text, line.kinds) });
     }
     flushBlock();
-    if (fence !== undefined) chunks.push({ kind: 'block', text: [...fenced, fence].join('\n') });
+    if (fence !== undefined) flushFence();
 
     let markdown = '';
     let prev: string | undefined;
@@ -123,8 +126,9 @@ function renderLine(text: string, kinds: (Kind | null)[]): string {
 function renderRun(text: string, kind: Kind | null): string {
     switch (kind) {
         case 'CODE':
-            // Markdown 行内代码（KDoc、Dartdoc、JSDoc 中的 `x`）原样保留，其余包成行内代码。
-            return isInlineCode(text) ? text : codeWithSpaces(text);
+            // 一律重新包成行内代码：Markdown 行内代码（`x`）先去掉外层反引号。不原样输出，
+            // 否则 {@code `a` <img …> `b`} 这类内容会把中间的 HTML / Markdown 漏出代码样式。
+            return codeWithSpaces(stripInlineTicks(text));
         case 'REFERENCE': {
             const inner = /^\[[^\]]+]$/.test(text) ? text.substring(1, text.length - 1) : text; // KDoc/Dartdoc 的 [ref]
             return codeWithSpaces(inner);
@@ -147,6 +151,23 @@ function codeWithSpaces(text: string): string {
     const lead = text.substring(0, text.indexOf(core));
     const trail = text.substring(text.indexOf(core) + core.length);
     return lead + inlineCode(core) + trail;
+}
+
+/** `x` / ``x`` → x（只去掉首尾成对、且中间不再出现同样长度反引号串的外层）。 */
+function stripInlineTicks(text: string): string {
+    const core = text.trim();
+    const m = /^(`+)([\s\S]*?[^`])\1$/.exec(core);
+    if (!m || m[2].includes(m[1])) return text;
+    const inner = m[2].length > 1 && m[2].startsWith(' ') && m[2].endsWith(' ') ? m[2].slice(1, -1) : m[2];
+    return text.replace(core, inner);
+}
+
+/** 代码块：围栏用比内容中最长反引号串更长的反引号；信息串只保留安全字符。 */
+function codeBlock(lines: string[], info: string): string {
+    const body = lines.join('\n');
+    const ticks = '`'.repeat(Math.max(3, longestRun(body, '`') + 1));
+    const lang = /^[\w+#.-]+/.exec(info)?.[0] ?? '';
+    return `${ticks}${lang}\n${body}\n${ticks}`;
 }
 
 function isInlineCode(text: string): boolean {

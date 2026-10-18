@@ -130,6 +130,37 @@ describe('幽灵文字、悬停与匹配（六种语言）', () => {
         await waitFor(() => state(editor.document), s => !s?.error && s?.hints.length === count, '恢复后', 30_000);
     });
 
+    it('改变文档的 languageId（VS Code 会先关闭再重新打开文档）后译文恢复，编辑后继续刷新', async () => {
+        const editor = await open('cart.ts');
+        const count = expectedHints('cart.ts').length;
+        await waitFor(() => state(editor.document), s => s?.hints.length === count, '初始');
+        const document = await vscode.languages.setTextDocumentLanguage(editor.document, 'plaintext');
+        assert.equal(document.languageId, 'plaintext');
+        await waitFor(() => state(document), s => s?.hints.length === count, 'languageId 改变后');
+        const shown = await vscode.window.showTextDocument(document);
+        await shown.edit(b => b.insert(new vscode.Position(0, 0), '\n'));
+        await waitFor(() => state(document), s => s?.version === document.version && s.hints.length === count
+            && s.hints.every(h => h.via === 'textHash'), '编辑后刷新');
+        await vscode.commands.executeCommand('workbench.action.files.revert');
+    });
+
+    it('index.json 无法解析时忽略它，只用 mappings.json，并提示一次', async () => {
+        const editor = await open('OrderService.java');
+        const count = expectedHints('OrderService.java').length;
+        await waitFor(() => state(editor.document), s => s?.hints.length === count, '初始');
+        const path = join(workspaceDir(), '.codei18n', 'index.json');
+        const original = readFileSync(path, 'utf8');
+        try {
+            writeFileSync(path, '{"version":"1","files":');
+            const degraded = await waitFor(() => state(editor.document), s => !!s && !s.error && s.hints.length > 0
+                && s.hints.every(h => h.via === 'global'), '只用 mappings.json', 30_000);
+            assert.ok(degraded!.hints.length > 0);
+        } finally {
+            writeFileSync(path, original);
+        }
+        await waitFor(() => state(editor.document), s => s?.hints.length === count && s.hints.every(h => h.via === 'location'), '恢复', 30_000);
+    });
+
     it('不写入源码：样例文件与夹具逐字节相同', () => {
         for (const name of SAMPLES) {
             const fixture = readFileSync(join(process.env.CODEI18N_FIXTURES!, name));

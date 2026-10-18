@@ -18,6 +18,8 @@ export interface DocumentTranslations {
     readonly root?: vscode.Uri;
     readonly index?: MappingIndex;
     readonly error?: string;
+    /** 不影响显示的问题（例如 index.json 无法解析、已忽略），同样只提示一次。 */
+    readonly warning?: string;
     /** 按起始位置排序；`type` 已补全为 line/block/doc。 */
     readonly hints: readonly Hint[];
     /** 计算时的文档版本。 */
@@ -82,6 +84,10 @@ export class TranslationController implements vscode.Disposable {
             vscode.workspace.onDidChangeTextDocument(e => this.documentChanged(e)),
             vscode.workspace.onDidSaveTextDocument(d => this.schedule(d.uri)),
             vscode.workspace.onDidCloseTextDocument(d => this.forget(d.uri)),
+            // 改变 languageId 时 VS Code 先关闭再重新打开同一个文档：重新打开后要再算一次。
+            vscode.workspace.onDidOpenTextDocument(d => {
+                if (this.targets().some(t => t.uri.toString() === d.uri.toString())) this.schedule(d.uri);
+            }),
             vscode.window.onDidChangeVisibleTextEditors(() => this.scheduleAll()),
             vscode.workspace.onDidChangeWorkspaceFolders(() => this.reload()),
             vscode.workspace.onDidChangeConfiguration(e => {
@@ -164,7 +170,8 @@ export class TranslationController implements vscode.Disposable {
             const result = await this.compute(doc);
             if (result === undefined) continue; // 文档在计算期间又被修改，等待下一次刷新
             if (result.root) roots.add(result.root.toString());
-            if (result.root && result.error) errors.set(result.root.toString(), result.error);
+            if (result.root && result.error) errors.set(result.root.toString(), t.loadError(result.root.fsPath, result.error));
+            else if (result.root && result.warning) errors.set(result.root.toString(), `CodeI18n: ${result.root.fsPath}: ${result.warning}`);
             this.publish(doc.uri, result);
         }
         this.report(errors, roots);
@@ -194,9 +201,9 @@ export class TranslationController implements vscode.Disposable {
         const stale = () => doc.isClosed || doc.version !== version || state.generation !== generation;
         const config = vscode.workspace.getConfiguration('codei18n', doc.uri);
         if (!config.get<boolean>('enabled', true)) return { hints: [], version, reason: 'disabled' };
-        const folder = vscode.workspace.getWorkspaceFolder(doc.uri);
+        const folder = outermostFolder(doc.uri);
         if (!folder) return { hints: [], version, reason: 'no-folder' };
-        const root = await findRoot(doc.uri, folder.uri);
+        const root = await findRoot(doc.uri, folder);
         if (stale()) return undefined;
         if (!root) return { hints: [], version, reason: 'no-root' };
         let index: MappingIndex | undefined;
@@ -225,17 +232,19 @@ export class TranslationController implements vscode.Disposable {
         const hints = scan(index, { relativePath, contentHash, text }, pieces).map(h => h.type
             ? h
             : { ...h, type: syntax ? commentType(text.substring(h.start, h.end), syntax) : undefined });
-        return { root, index, hints, version };
+        return { root, index, hints, version, warning: index.indexError && t.indexIgnored(index.indexError) };
     }
 
     private parsed(doc: vscode.TextDocument, state: DocState): Promise<ParsedDocument | undefined> {
         if (!state.parsed) {
             const syntax = syntaxForFile(doc.uri.path)!;
-            state.parsed = ParsedDocument.create(this.grammars, syntax, doc.getText()).catch(e => {
-                // 语法加载失败时只按位置匹配（文件未修改时），不报错。
+            const parsed: Promise<ParsedDocument | undefined> = ParsedDocument.create(this.grammars, syntax, doc.getText()).catch(e => {
+                // 语法加载失败时本次只按位置匹配（文件未修改时），不报错；下次刷新再试。
                 console.error('[CodeI18n] tree-sitter', e);
+                if (state.parsed === parsed) state.parsed = undefined;
                 return undefined;
             });
+            state.parsed = parsed;
         }
         return state.parsed;
     }
@@ -243,11 +252,17 @@ export class TranslationController implements vscode.Disposable {
     private documentChanged(e: vscode.TextDocumentChangeEvent): void {
         const key = e.document.uri.toString();
         const state = this.states.get(key);
-        if (!state || e.contentChanges.length === 0) return;
+        if (e.contentChanges.length === 0) return;
+        if (!state) {
+            // 还没有结果（例如 languageId 改变后重新打开）：可见时安排一次计算。
+            if (this.targets().some(t => t.uri.toString() === key)) this.schedule(e.document.uri);
+            return;
+        }
         // 语法树增量编辑：在下一次匹配时增量重新解析。
         const changes: TextChange[] = e.contentChanges.map(c => ({
             startLine: c.range.start.line, startCharacter: c.range.start.character,
             endLine: c.range.end.line, endCharacter: c.range.end.character, text: c.text,
+            offset: c.rangeOffset, length: c.rangeLength,
         }));
         void state.parsed?.then(p => p?.applyChanges(changes));
         const hints = shiftHints(state.result.hints, e.contentChanges.map(c => ({ offset: c.rangeOffset, length: c.rangeLength, text: c.text })));
@@ -271,7 +286,7 @@ export class TranslationController implements vscode.Disposable {
         for (const [root, message] of errors) {
             if (this.reported.get(root) === message) continue;
             this.reported.set(root, message);
-            void vscode.window.showWarningMessage(t.loadError(vscode.Uri.parse(root).fsPath, message));
+            void vscode.window.showWarningMessage(message);
         }
         for (const root of roots) if (!errors.has(root)) this.reported.delete(root);
     }
@@ -282,6 +297,23 @@ export class TranslationController implements vscode.Disposable {
         this.states.clear();
         this.disposables.forEach(d => d.dispose());
     }
+}
+
+/**
+ * 包含该文件的最外层工作区文件夹。多根工作区里文件夹可能嵌套（例如 /repo 与 /repo/packages/app），
+ * 以最外层为边界，才能找到外层文件夹里的 .codei18n。
+ */
+function outermostFolder(file: vscode.Uri): vscode.Uri | undefined {
+    const path = comparable(file.path);
+    let best: vscode.Uri | undefined;
+    for (const folder of vscode.workspace.workspaceFolders ?? []) {
+        const uri = folder.uri;
+        if (uri.scheme !== file.scheme || uri.authority !== file.authority) continue;
+        const base = comparable(uri.path.replace(/\/$/, ''));
+        if (!path.startsWith(base + '/')) continue;
+        if (!best || base.length < best.path.replace(/\/$/, '').length) best = uri;
+    }
+    return best;
 }
 
 /** 从文件所在目录向上找最近的含 .codei18n 目录的目录，不越过工作区文件夹。 */

@@ -147,15 +147,19 @@ jobs:
             fi
           } > notes.md
 
-          git tag -f nightly "$HEAD_SHA"
-          git push -f origin refs/tags/nightly
-
+          # 顺序保证任何一步失败都可安全重试：先上传新附件，再删旧附件，最后才移动 tag。
+          # tag 没移动时，下一次定时运行仍会发现 HEAD 与 tag 不同而重新构建。
           if gh release view nightly > /dev/null 2>&1; then
-            gh release edit nightly --title "$title" --notes-file notes.md --prerelease --latest=false
-            gh release view nightly --json assets --jq '.assets[].name' | while IFS= read -r name; do
-              gh release delete-asset nightly "$name" --yes
-            done
             gh release upload nightly dist/* --clobber
+            keep=$(cd dist && ls)
+            gh release view nightly --json assets --jq '.assets[].name' | while IFS= read -r name; do
+              if ! grep -qxF "$name" <<< "$keep"; then gh release delete-asset nightly "$name" --yes; fi
+            done
+            git tag -f nightly "$HEAD_SHA"
+            git push -f origin refs/tags/nightly
+            gh release edit nightly --title "$title" --notes-file notes.md --prerelease --latest=false
           else
-            gh release create nightly dist/* --verify-tag --title "$title" --notes-file notes.md --prerelease --latest=false
+            # 首次发布：先建草稿并上传附件（草稿不创建 tag），全部成功后公开，此时才在 HEAD 上创建 tag。
+            gh release create nightly dist/* --target "$HEAD_SHA" --title "$title" --notes-file notes.md --prerelease --draft
+            gh release edit nightly --draft=false --latest=false
           fi
