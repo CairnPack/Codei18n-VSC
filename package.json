@@ -1,0 +1,144 @@
+{
+  "name": "codei18n-vscode",
+  "displayName": "CodeI18n",
+  "description": "%description%",
+  "version": "0.1.0",
+  "publisher": "cairnpack",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/CairnPack/Codei18n-VSC.git"
+  },
+  "engines": {
+    "vscode": "^1.105.0"
+  },
+  "categories": [
+    "Other"
+  ],
+  "keywords": [
+    "i18n",
+    "comments",
+    "translation",
+    "codei18n"
+  ],
+  "main": "./dist/extension.js",
+  "extensionKind": [
+    "workspace"
+  ],
+  "activationEvents": [
+    "onStartupFinished"
+  ],
+  "capabilities": {
+    "untrustedWorkspaces": {
+      "supported": true
+    },
+    "virtualWorkspaces": false
+  },
+  "contributes": {
+    "commands": [
+      {
+        "command": "codei18n.toggle",
+        "title": "%command.toggle%",
+        "category": "CodeI18n"
+      },
+      {
+        "command": "codei18n.toggleSideView",
+        "title": "%command.toggleSideView%",
+        "category": "CodeI18n"
+      },
+      {
+        "command": "codei18n.reload",
+        "title": "%command.reload%",
+        "category": "CodeI18n"
+      }
+    ],
+    "keybindings": [
+      {
+        "command": "codei18n.toggle",
+        "key": "ctrl+alt+shift+o",
+        "when": "editorTextFocus"
+      },
+      {
+        "command": "codei18n.toggleSideView",
+        "key": "ctrl+alt+shift+p",
+        "when": "editorTextFocus"
+      }
+    ],
+    "menus": {
+      "editor/context": [
+        {
+          "command": "codei18n.toggle",
+          "group": "navigation@90"
+        }
+      ]
+    },
+    "configuration": {
+      "title": "CodeI18n",
+      "properties": {
+        "codei18n.enabled": {
+          "type": "boolean",
+          "default": true,
+          "scope": "resource",
+          "description": "%config.enabled%"
+        },
+        "codei18n.language": {
+          "type": "string",
+          "default": "",
+          "scope": "resource",
+          "description": "%config.language%"
+        },
+        "codei18n.ghostText.enabled": {
+          "type": "boolean",
+          "default": true,
+          "scope": "resource",
+          "description": "%config.ghostText.enabled%"
+        },
+        "codei18n.ghostText.maxLength": {
+          "type": "integer",
+          "default": 80,
+          "minimum": 10,
+          "maximum": 1000,
+          "scope": "resource",
+          "description": "%config.ghostText.maxLength%"
+        },
+        "codei18n.hover.enabled": {
+          "type": "boolean",
+          "default": true,
+          "scope": "resource",
+          "description": "%config.hover.enabled%"
+        }
+      }
+    }
+  },
+  "scripts": {
+    "build": "node scripts/build.mjs",
+    "watch": "node scripts/build.mjs --watch",
+    "typecheck": "tsc -p . --noEmit",
+    "lint": "eslint . && tsc -p . --noEmit && tsc -p test/integration --noEmit",
+    "test": "vitest run",
+    "test:integration": "node scripts/build.mjs && tsc -p test/integration && node out/integration/runTest.js",
+    "check:vectors": "node scripts/check-vectors.mjs",
+    "sync:fixtures": "node scripts/sync-fixtures.mjs",
+    "package": "node scripts/build.mjs --production && vsce package --no-dependencies"
+  },
+  "devDependencies": {
+    "@types/mocha": "10.0.10",
+    "@types/node": "22.20.5",
+    "@types/vscode": "1.105.0",
+    "@vscode/test-electron": "3.1.0",
+    "@vscode/vsce": "4.0.0",
+    "esbuild": "0.28.2",
+    "eslint": "10.13.0",
+    "mocha": "11.7.5",
+    "typescript": "6.0.3",
+    "typescript-eslint": "8.71.2",
+    "vitest": "5.0.5"
+  },
+  "dependencies": {
+    "web-tree-sitter": "0.26.13"
+  },
+  "overrides": {
+    "serialize-javascript": "^7.0.5",
+    "diff": "^8.0.3"
+  }
+}

@@ -1,0 +1,7 @@
+# 统一以 LF 入库与检出，Windows 与 Linux 的 CI 行为一致
+* text=auto eol=lf
+
+# 一致性测试与集成测试按字节计算 SHA-1，夹具必须固定为 LF，不受 core.autocrlf 影响
+test/fixtures/** text eol=lf
+test/testdata/** text eol=lf
+*.wasm binary

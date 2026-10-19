@@ -1,0 +1,103 @@
+name: CI
+
+# PR 与 push 时在 Windows 和 Ubuntu（xvfb）上跑 lint、单测与集成测试；
+# 集成测试同时覆盖 package.json 声明的最低 VS Code 版本（engines.vscode）与 stable。
+# 另检查共享测试向量与 core、测试夹具与 IDEA 插件的 examples/languages 是否一致。
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    name: ${{ matrix.os }} · VS Code ${{ matrix.vscode }}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+        vscode: ['1.105.0', stable]
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+
+      - name: Lint
+        run: npm run lint
+
+      - name: 单测（共享向量、移植用例、一致性测试、行映射）
+        run: npm test
+
+      - uses: actions/cache@v6
+        with:
+          path: .vscode-test
+          key: vscode-test-${{ runner.os }}-${{ matrix.vscode }}-${{ github.run_id }}
+          restore-keys: vscode-test-${{ runner.os }}-${{ matrix.vscode }}-
+
+      - name: 集成测试（Ubuntu，xvfb）
+        if: runner.os == 'Linux'
+        env:
+          VSCODE_VERSION: ${{ matrix.vscode }}
+        run: xvfb-run -a npm run test:integration
+
+      - name: 集成测试（Windows）
+        if: runner.os == 'Windows'
+        env:
+          VSCODE_VERSION: ${{ matrix.vscode }}
+        run: npm run test:integration
+
+  consistency:
+    name: 共享向量与测试夹具
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+
+      - name: 共享测试向量与 core（CairnPack/Codei18n main）一致
+        run: node scripts/check-vectors.mjs
+
+      - name: 测试夹具与 IDEA 插件（CairnPack/Codei18n-IDEA main）的 examples/languages 一致
+        env:
+          CODEI18N_IDEA_DIR: ${{ runner.temp }}/Codei18n-IDEA
+        run: |
+          git clone --depth 1 https://github.com/CairnPack/Codei18n-IDEA.git "$CODEI18N_IDEA_DIR"
+          node scripts/sync-fixtures.mjs --check
+
+  package:
+    name: 打包检查
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+
+      - name: 打包 VSIX 并列出内容
+        run: |
+          npm run package -- --out codei18n-vscode-ci.vsix
+          unzip -l codei18n-vscode-ci.vsix
+          echo "VSIX 大小：$(du -h codei18n-vscode-ci.vsix | cut -f1)" >> "$GITHUB_STEP_SUMMARY"
