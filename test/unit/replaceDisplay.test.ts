@@ -30,6 +30,11 @@ describe('替换显示：逐行替换注释', () => {
             .toEqual(['/*', '* 一', '* 二 三 */']);
     });
 
+    it('CRLF 文件：原注释含 \r\n 时结果相同', () => {
+        expect(replaceSegments(['/*', ' * a', ' */'], 0, 3, '/*\r\n * a\r\n */', '/*\n * 甲\n */').map(s => s.label)).toEqual(['/*', '* 甲', '*/']);
+        expect(replaceSegments(['// a', '// b'], 0, 4, '// a\r\n// b', '// 一\r\n// 二').map(s => s.label)).toEqual(['// 一', '// 二']);
+    });
+
     it('与代码同行的注释只隐藏注释部分', () => {
         const line = 'int x = 1; // count';
         expect(replaceSegments([line], 11, line.length, '// count', '// 计数')).toEqual([{ line: 0, start: 11, end: 19, label: '// 计数' }]);

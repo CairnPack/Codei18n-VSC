@@ -1,7 +1,9 @@
 import * as assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
+import { copyFileSync, mkdtempSync, readFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import * as vscode from 'vscode';
-import { activate, expectedHints, open, resetSettings, SAMPLES, sleep, state, waitFor } from './helpers';
+import { activate, expectedHints, open, resetSettings, SAMPLES, sleep, state, waitFor, workspaceDir } from './helpers';
 
 async function useReplace(): Promise<void> {
     await vscode.workspace.getConfiguration('codei18n').update('display', 'replace', vscode.ConfigurationTarget.Global);
@@ -28,13 +30,16 @@ describe('替换显示', () => {
                 s => s?.hints.length === expected.length && s.display?.mode === 'replace' && s.display.labels.length > 0, `${name} 的替换显示`);
             const display = st!.display!;
             assert.deepEqual(display.ghost, []);
-            // 每条注释的每一行都被隐藏，且隐藏的只是注释本身
+            // 每条注释的每个非空行都被隐藏，且隐藏的只是注释本身
             for (const h of st!.hints) {
                 for (let line = h.start.line; line <= h.end.line; line++) {
-                    assert.ok(display.labels.some(l => l.line === line) || display.hidden.some(t => h.comment.includes(t)), `${name} 第 ${line + 1} 行`);
+                    if (editor.document.lineAt(line).isEmptyOrWhitespace) continue;
+                    assert.ok(display.hidden.some(r => r.line === line), `${name} 第 ${line + 1} 行没有隐藏`);
                 }
             }
-            for (const text of display.hidden) assert.ok(st!.hints.some(h => h.comment.includes(text)), `隐藏了注释以外的文字：${text}`);
+            for (const r of display.hidden) {
+                assert.ok(st!.hints.some(h => r.line >= h.start.line && r.line <= h.end.line && h.comment.includes(r.text)), `隐藏了注释以外的文字：${r.text}`);
+            }
             // 译文（去掉 [MOCK …] 前缀之外）出现在标签里
             const labels = display.labels.map(l => l.text).join('\n');
             assert.match(labels, /\[MOCK en->zh-CN\]/);
@@ -64,6 +69,20 @@ describe('替换显示', () => {
         assert.ok(!covers(await state(editor.document, false)), '离开后立即换回了译文');
         const hiddenAgain = await waitFor(() => state(editor.document, false), s => covers(s), '换回译文', 3000);
         assert.deepEqual(hiddenAgain!.display!.ghost, []);
+    });
+
+    it('差异视图中不替换注释，改为行尾显示', async () => {
+        await vscode.commands.executeCommand('workbench.action.closeAllEditors');
+        await useReplace();
+        const right = vscode.Uri.file(join(workspaceDir(), 'OrderService.java'));
+        const left = vscode.Uri.file(join(mkdtempSync(join(tmpdir(), 'codei18n-')), 'OrderService.java'));
+        copyFileSync(right.fsPath, left.fsPath);
+        await vscode.commands.executeCommand('vscode.diff', left, right, 'diff');
+        const document = vscode.workspace.textDocuments.find(d => d.uri.toString() === right.toString())!;
+        const st = await waitFor(() => state(document), s => (s?.display?.ghost.length ?? 0) > 0, '差异视图中的行尾文字');
+        assert.equal(st!.display!.mode, 'ghost');
+        assert.deepEqual(st!.display!.hidden, []);
+        await vscode.commands.executeCommand('workbench.action.closeAllEditors');
     });
 
     it('切换显示模式命令在行尾与替换之间切换', async () => {

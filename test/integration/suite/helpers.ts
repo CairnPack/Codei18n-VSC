@@ -27,7 +27,7 @@ export interface DocState {
     display?: {
         mode: string;
         ghost: { line: number; text: string }[];
-        hidden: string[];
+        hidden: { line: number; character: number; text: string }[];
         labels: { line: number; character: number; text: string }[];
     };
 }

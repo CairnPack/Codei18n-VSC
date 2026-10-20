@@ -44,7 +44,7 @@ export function activate(context: vscode.ExtensionContext): void {
                 reason: result.reason,
                 display: plan && {
                     mode: plan.mode, ghost: plan.ghost,
-                    hidden: plan.hidden.map(r => document.getText(r)),
+                    hidden: plan.hidden.map(r => ({ line: r.start.line, character: r.start.character, text: document.getText(r) })),
                     labels: plan.labels.map(l => ({ line: l.position.line, character: l.position.character, text: l.text })),
                 },
                 hints: result.hints.map(h => ({

@@ -59,6 +59,7 @@ export interface RenderPlan {
  * - 行尾模式：注释（组）最后一行的行尾显示幽灵文字；
  * - 替换模式：隐藏注释文字并在原位显示译文（textDecoration 注入 `display: none`，文档内容不变）。
  *   光标所在行碰到的注释露出原文，译文暂时改为行尾幽灵文字；光标离开约 600 ms 后换回译文。
+ *   差异视图中不替换，改为行尾显示。
  */
 export class EditorPresenter implements vscode.Disposable {
     private readonly ghostType = vscode.window.createTextEditorDecorationType({
@@ -87,6 +88,7 @@ export class EditorPresenter implements vscode.Disposable {
                 editors.forEach(e => this.renderEditor(e));
             }),
             vscode.window.onDidChangeTextEditorSelection(e => this.selectionChanged(e.textEditor)),
+            vscode.window.tabGroups.onDidChangeTabs(() => vscode.window.visibleTextEditors.forEach(e => this.renderEditor(e))),
             vscode.workspace.onDidChangeConfiguration(e => {
                 if (e.affectsConfiguration('codei18n')) vscode.window.visibleTextEditors.forEach(ed => this.renderEditor(ed));
             }),
@@ -106,7 +108,8 @@ export class EditorPresenter implements vscode.Disposable {
 
     private renderEditor(editor: vscode.TextEditor): void {
         const document = editor.document;
-        const mode = displayMode(document.uri);
+        // 差异视图的两侧要对比真实内容：替换模式在这里退回行尾显示。
+        const mode = this.inDiff(editor) ? 'ghost' : displayMode(document.uri);
         const settings = ghostSettings(document.uri);
         const length = document.getText().length; // getText 每次都会重新拼接整篇文本，只取一次
         const hints = this.controller.get(document.uri).hints.filter(h => h.end <= length);
@@ -156,7 +159,7 @@ export class EditorPresenter implements vscode.Disposable {
 
     /** 替换模式：光标进入注释时立即露出原文；离开后稍等再换回译文，避免光标经过时闪烁。 */
     private selectionChanged(editor: vscode.TextEditor): void {
-        if (displayMode(editor.document.uri) !== 'replace') return;
+        if (displayMode(editor.document.uri) !== 'replace' || this.inDiff(editor)) return;
         const touched = this.touched(editor, this.controller.get(editor.document.uri).hints);
         const shown = this.revealed.get(editor) ?? new Set<number>();
         if ([...touched].some(s => !shown.has(s))) {
@@ -171,6 +174,19 @@ export class EditorPresenter implements vscode.Disposable {
                 this.renderEditor(editor);
             }, REHIDE_MS));
         }
+    }
+
+    /**
+     * 编辑器是否是差异视图的一侧：所在编辑器组的活动标签页是包含这个文档的文本差异。
+     * 差异视图两侧的 viewColumn 是 undefined，此时检查所有编辑器组。
+     */
+    private inDiff(editor: vscode.TextEditor): boolean {
+        const uri = editor.document.uri.toString();
+        const groups = vscode.window.tabGroups.all.filter(g => editor.viewColumn === undefined || g.viewColumn === editor.viewColumn);
+        return groups.some(g => {
+            const input = g.activeTab?.input;
+            return input instanceof vscode.TabInputTextDiff && (input.modified.toString() === uri || input.original.toString() === uri);
+        });
     }
 
     /** 与任一选区所在行相交的注释。 */
