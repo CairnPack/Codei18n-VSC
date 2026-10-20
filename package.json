@@ -2,7 +2,7 @@
   "name": "codei18n-vscode",
   "displayName": "CodeI18n",
   "description": "%description%",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "publisher": "cairnpack",
   "license": "MIT",
   "repository": {
@@ -39,6 +39,11 @@
       {
         "command": "codei18n.toggle",
         "title": "%command.toggle%",
+        "category": "CodeI18n"
+      },
+      {
+        "command": "codei18n.switchDisplayMode",
+        "title": "%command.switchDisplayMode%",
         "category": "CodeI18n"
       },
       {
@@ -87,6 +92,20 @@
           "scope": "resource",
           "description": "%config.language%"
         },
+        "codei18n.display": {
+          "type": "string",
+          "enum": [
+            "ghost",
+            "replace"
+          ],
+          "enumDescriptions": [
+            "%config.display.ghost%",
+            "%config.display.replace%"
+          ],
+          "default": "ghost",
+          "scope": "resource",
+          "description": "%config.display%"
+        },
         "codei18n.ghostText.enabled": {
           "type": "boolean",
           "default": true,
@@ -108,7 +127,19 @@
           "description": "%config.hover.enabled%"
         }
       }
-    }
+    },
+    "colors": [
+      {
+        "id": "codei18n.replaceForeground",
+        "description": "%color.replaceForeground%",
+        "defaults": {
+          "dark": "#6A9955",
+          "light": "#008000",
+          "highContrast": "#7CA668",
+          "highContrastLight": "#515151"
+        }
+      }
+    ]
   },
   "scripts": {
     "build": "node scripts/build.mjs",

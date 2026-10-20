@@ -5,7 +5,12 @@
   "command.reload": "重新加载 CodeI18n 译文（Reload CodeI18n Translations）",
   "config.enabled": "显示 CodeI18n 注释译文。",
   "config.language": "显示语言，例如 zh-CN、zh-TW、ja。留空则跟随项目 .codei18n 配置。",
-  "config.ghostText.enabled": "在注释（组）最后一行的行尾以幽灵文字显示译文。",
+  "config.ghostText.enabled": "行尾显示模式下，在注释（组）最后一行的行尾以幽灵文字显示译文。",
   "config.ghostText.maxLength": "幽灵文字的最大字符数；更长或多行的译文只显示开头并加 “…”。",
-  "config.hover.enabled": "悬停在有译文的注释上时显示完整译文。"
+  "config.hover.enabled": "悬停在有译文的注释上时显示完整译文。",
+  "command.switchDisplayMode": "切换 CodeI18n 显示模式",
+  "config.display": "译文在编辑器中的显示方式。",
+  "config.display.ghost": "注释最后一行的行尾幽灵文字。",
+  "config.display.replace": "用译文替换注释文字；光标所在行露出原注释。不修改文件本身。",
+  "color.replaceForeground": "替换显示模式下译文的颜色。"
 }

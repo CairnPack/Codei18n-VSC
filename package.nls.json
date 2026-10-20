@@ -5,7 +5,12 @@
   "command.reload": "Reload CodeI18n Translations",
   "config.enabled": "Show CodeI18n comment translations.",
   "config.language": "Display language, e.g. zh-CN, zh-TW, ja. Leave empty to follow the project's .codei18n configuration.",
-  "config.ghostText.enabled": "Show translations as ghost text at the end of the comment's last line.",
+  "config.ghostText.enabled": "In ghost display mode, show translations as ghost text at the end of the comment's last line.",
   "config.ghostText.maxLength": "Maximum number of characters of ghost text; longer or multi-line translations are cut with '…'.",
-  "config.hover.enabled": "Show the full translation when hovering a translated comment."
+  "config.hover.enabled": "Show the full translation when hovering a translated comment.",
+  "command.switchDisplayMode": "Switch CodeI18n Display Mode",
+  "config.display": "Where translations are shown in the editor.",
+  "config.display.ghost": "Ghost text at the end of the comment's last line.",
+  "config.display.replace": "Replace the comment text with the translation. Lines touched by the cursor show the original comment. The file itself is never changed.",
+  "color.replaceForeground": "Color of translations that replace comments (display mode 'replace')."
 }

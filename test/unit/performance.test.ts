@@ -3,6 +3,7 @@ import { sha1, textHash } from '../../src/core/commentText';
 import { Piece } from '../../src/core/commentGroups';
 import { scan } from '../../src/core/hints';
 import { MappingIndex } from '../../src/core/mappingIndex';
+import { replaceSegments } from '../../src/core/replaceDisplay';
 
 /** 接近 2 MiB 上限、4000 条注释的文件：匹配不能是平方级（曾实测 14–28 s）。 */
 describe('大文件匹配的性能', () => {
@@ -35,5 +36,18 @@ describe('大文件匹配的性能', () => {
         expect(hints.length).toBe(COUNT);
         expect(hints[COUNT - 1].text).toBe(`// 第 ${COUNT - 1} 条注释`);
         expect(elapsed).toBeLessThan(3000);
+    });
+});
+
+/** 替换显示在每次光标进出注释时都会重新计算所有注释的分段。 */
+describe('替换显示分段的性能', () => {
+    it('4000 条三行块注释在 500 ms 内完成', () => {
+        const lines = ['    /*', '     * comment body that is long enough to matter', '     */'];
+        const original = lines.join('\n').trimStart();
+        const started = performance.now();
+        let count = 0;
+        for (let i = 0; i < 4000; i++) count += replaceSegments(lines, 4, 7, original, `/*\n * 第 ${i} 条注释\n */`).length;
+        expect(count).toBe(12000);
+        expect(performance.now() - started).toBeLessThan(500);
     });
 });
