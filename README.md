@@ -1,6 +1,6 @@
 # CodeI18n for VS Code
 
-读取项目 `.codei18n` 翻译缓存，在 VS Code 里显示源码注释的译文：**行尾幽灵文字 + 悬停 + 侧边译文视图**。与 [CodeI18n IDEA 插件](https://github.com/CairnPack/Codei18n-IDEA) 的作用相同——只读取已有缓存，不修改源码、不调用 CLI 或翻译服务、不读写任何令牌。
+读取项目 `.codei18n` 翻译缓存，在 VS Code 里显示源码注释的译文：**行尾幽灵文字或替换显示 + 悬停 + 侧边译文视图**。与 [CodeI18n IDEA 插件](https://github.com/CairnPack/Codei18n-IDEA) 的作用相同——只读取已有缓存，不修改源码、不调用 CLI 或翻译服务、不读写任何令牌。
 
 支持 Kotlin、Java、TypeScript（含 TSX）、JavaScript（含 JSX）、Dart、C#。Go、Rust 等没有内置语法的文件，在文件未修改时按 `index.json` 的位置显示译文。
 
@@ -16,11 +16,12 @@
 
 ## 显示形式
 
-VS Code 没有 IDEA 那样的块级 inlay（不能在注释下方插入虚拟行），所以用三种方式互补：
+VS Code 没有 IDEA 那样的块级 inlay（不能在注释下方插入多行虚拟文字），所以用以下几种方式互补。编辑器内的显示由 `codei18n.display` 选择，`CodeI18n: Switch CodeI18n Display Mode` 命令在两者之间切换：
 
-- **行尾幽灵文字**（默认开启）：译文显示在注释（组）最后一行的行尾，颜色跟随主题（`editorInlayHint.foreground`）。不进入文档内容，不影响复制和 diff。单行译文全文显示；多行译文或超过最大长度时只显示开头并加 `…`。
+- **行尾幽灵文字**（`ghost`，默认）：译文显示在注释（组）最后一行的行尾，颜色跟随主题（`editorInlayHint.foreground`）。不进入文档内容，不影响复制和 diff。单行译文全文显示；多行译文或超过最大长度时只显示开头并加 `…`。
+- **替换显示**（`replace`，对应 IDEA 的“替换显示”）：把注释文字隐藏，在原位逐行显示按原注释语法包装的译文（行注释沿用原标记，块注释、文档注释保留 `/* */`、`/** */` 结构，缩进和注释前后的代码保持不变）。**只改显示，不改文档**：文件内容、保存、复制、搜索、Git diff 都还是原注释。光标所在行碰到的注释露出原文，译文暂时改为行尾幽灵文字；光标离开约 0.6 秒后换回译文。点击译文即可把光标移进原注释。颜色为 `codei18n.replaceForeground`（默认接近 Dark+/Light+ 的注释色，可在 `workbench.colorCustomizations` 中修改）。
 - **悬停**：鼠标停在有译文的注释上时显示完整译文。文档注释按语言渲染——Javadoc 的 `{@link}`、`{@code}`、`@param`，KDoc 与 Dartdoc 的 `[引用]`，JSDoc/TSDoc 的 `{类型}` 与 `@example` 代码块；C# XML 文档注释去掉标签按段落显示（`<summary>` 正文、“参数 x: …”、“返回: …”，标签名按显示语言本地化）。代码与引用显示为代码样式，其余文字全部转义，不会被误当作 Markdown。底部小字显示原语言与命中方式（位置 / textHash / 全局），方便排查。
-- **侧边译文视图**（替代 IDEA 的“替换显示”）：`Ctrl+Alt+Shift+P` 在旁边打开只读虚拟文档，内容是把注释替换成译文的源码，语言与原文件相同（保留语法高亮）。译文按原注释的语法包装：行注释每行加原标记，块注释、文档注释保留 `/* */`、`/** */` 或 `///` 结构，没有译文的注释保持原样。两边滚动时相同的代码行对齐（注释行数变化时按行映射）；原文件修改后视图随之刷新。虚拟文档绝不写回磁盘。
+- **侧边译文视图**：`Ctrl+Alt+Shift+P` 在旁边打开只读虚拟文档，内容是把注释替换成译文的源码，语言与原文件相同（保留语法高亮）。译文按原注释的语法包装：行注释每行加原标记，块注释、文档注释保留 `/* */`、`/** */` 或 `///` 结构，没有译文的注释保持原样。两边滚动时相同的代码行对齐（注释行数变化时按行映射）；原文件修改后视图随之刷新。虚拟文档绝不写回磁盘。
 
 状态栏在有 `.codei18n` 的文件上显示当前显示语言和命中数量，点击打开设置；加载出错时显示警告，同一错误只通知一次。
 
@@ -68,7 +69,8 @@ codei18n translate
 | --- | --- | --- |
 | `codei18n.enabled` | `true` | 显示译文 |
 | `codei18n.language` | `""` | 显示语言，如 `zh-CN`、`zh-TW`、`ja`；留空跟随项目配置 |
-| `codei18n.ghostText.enabled` | `true` | 显示行尾幽灵文字 |
+| `codei18n.display` | `ghost` | 编辑器内的显示方式：`ghost` 行尾幽灵文字，`replace` 替换显示 |
+| `codei18n.ghostText.enabled` | `true` | 行尾模式下显示行尾幽灵文字 |
 | `codei18n.ghostText.maxLength` | `80` | 幽灵文字最大字符数，超出或多行时截断加 `…` |
 | `codei18n.hover.enabled` | `true` | 悬停显示完整译文 |
 
@@ -80,6 +82,7 @@ codei18n translate
 | --- | --- | --- |
 | CodeI18n: Show CodeI18n Translations | `Ctrl+Alt+Shift+O` | 开关译文显示（也在编辑器右键菜单中）。改写当前生效的那一级 `codei18n.enabled`；没有在工作区设置过时改用户设置，不会在项目里新建 `.vscode/settings.json` |
 | CodeI18n: Open CodeI18n Translation View to the Side | `Ctrl+Alt+Shift+P` | 打开或关闭侧边译文视图 |
+| CodeI18n: Switch CodeI18n Display Mode | — | 在行尾显示与替换显示之间切换（写入方式与开关命令相同）。IDEA 的 `Ctrl+Alt+Shift+P` 在这里已用于侧边视图，所以不设默认快捷键 |
 | CodeI18n: Reload CodeI18n Translations | — | 强制重新读取所有缓存 |
 
 快捷键可在 Keyboard Shortcuts 中修改。
@@ -90,7 +93,8 @@ codei18n translate
 
 ## 边界与已知限制
 
-- 幽灵文字只显示译文的**首行**（多行时加 `…`），完整译文看悬停或侧边视图；不做语法高亮。
+- 幽灵文字只显示译文的**首行**（多行时加 `…`），完整译文看悬停、替换显示或侧边视图；不做语法高亮。
+- 替换显示不能增删行：译文行数少于原注释时多出的行留空，多于原注释时超出部分并入最后一行。隐藏原文借助装饰样式注入 `display: none`，这不是 VS Code 公开承诺的行为，已在 1.105 与 1.142 上验证；自动换行仍按原文长度计算。
 - 大于 2 MiB 的源码不处理；大于 32 MiB 的 JSON 拒绝加载并提示；`index.json` 主版本不认识或无法解析时忽略整个文件，只用 `mappings.json`（无法解析时提示一次；IDEA 插件此时会撤下全部译文，这里按 `docs/index-format.md` §9.1 处理）。
 - Go、Rust 等没有内置语法的文件只在未修改时按位置显示；文件有修改时不显示。
 - 侧边视图的标签名与原文件相同（虚拟文档，scheme 为 `codei18n`）。
@@ -119,7 +123,7 @@ Linux 上集成测试需要显示服务器，可用 `xvfb-run -a npm run test:in
 - **一致性测试**：对 `test/fixtures/languages` 中每个未修改的样例文件，“tree-sitter 提取 + §6.1 合并 + §6.2 归一化”的结果与该工程 `index.json` 的 `range`、`parts`、`type`、`textHash` 逐条完全相同；
 - 侧边视图的内容与行映射、编辑时译文的平移与撤下、缓存的重试与失效。
 
-集成测试（`@vscode/test-electron`）把 `test/fixtures/languages` 复制为测试工程，六种语言逐个打开，断言块注释、行注释组（只有一条译文，挂在最后一行）、文档注释的精确译文以及字符串里的 `//` 没有译文；修改未保存文档后译文仍跟着注释走；外部改写 `mappings.json` 后自动刷新；侧边视图的内容与滚动同步；设置项与开关命令；不写入源码。扩展拿不到装饰的渲染结果，所以只在测试模式下注册内部命令 `codei18n._test.state`，返回当前计算出的提示。
+集成测试（`@vscode/test-electron`）把 `test/fixtures/languages` 复制为测试工程，六种语言逐个打开，断言块注释、行注释组（只有一条译文，挂在最后一行）、文档注释的精确译文以及字符串里的 `//` 没有译文；修改未保存文档后译文仍跟着注释走；外部改写 `mappings.json` 后自动刷新；侧边视图的内容与滚动同步；替换显示的隐藏范围与原位译文、光标进出时的露出与换回、文档内容不变；设置项与开关命令；不写入源码。扩展拿不到装饰的渲染结果，所以只在测试模式下注册内部命令 `codei18n._test.state`，返回当前计算出的提示和编辑器绘制的装饰。
 
 `test/fixtures/languages` 是 IDEA 插件 `examples/languages` 的拷贝，用 `npm run sync:fixtures -- --ref origin/main` 从聚合仓库中的兄弟目录同步（`CODEI18N_IDEA_DIR` 可指定 IDEA 仓库位置），`--check` 只检查。
 

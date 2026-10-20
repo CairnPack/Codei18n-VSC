@@ -23,6 +23,13 @@ export interface DocState {
     error?: string;
     version: number;
     hints: HintState[];
+    /** 编辑器当前绘制的内容：hidden 是被隐藏的原文片段，labels 是原位显示的译文。 */
+    display?: {
+        mode: string;
+        ghost: { line: number; text: string }[];
+        hidden: string[];
+        labels: { line: number; character: number; text: string }[];
+    };
 }
 
 export const SAMPLES = ['Inventory.kt', 'OrderService.java', 'cart.ts', 'format.js', 'invoice.dart', 'Ledger.cs'];
@@ -81,7 +88,7 @@ export function expectedHints(name: string): { line: number; character: number; 
 
 export async function resetSettings(): Promise<void> {
     const config = vscode.workspace.getConfiguration('codei18n');
-    for (const key of ['enabled', 'language', 'ghostText.enabled', 'ghostText.maxLength', 'hover.enabled']) {
+    for (const key of ['enabled', 'language', 'display', 'ghostText.enabled', 'ghostText.maxLength', 'hover.enabled']) {
         await config.update(key, undefined, vscode.ConfigurationTarget.Global);
     }
 }
